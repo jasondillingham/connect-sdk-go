@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strings"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
@@ -90,6 +91,11 @@ func NewClient(url string, token string) Client {
 
 // NewClientWithUserAgent Returns a Secret Service client for a given url and jwt and identifies with userAgent
 func NewClientWithUserAgent(url string, token string, userAgent string) Client {
+	// Trim surrounding whitespace so tokens loaded from files (e.g. Kubernetes
+	// secrets created with `--from-file`) don't produce an unsendable
+	// Authorization header. See https://github.com/1Password/connect-sdk-go/issues/73.
+	token = strings.TrimSpace(token)
+
 	if !opentracing.IsGlobalTracerRegistered() {
 		cfg := jaegerClientConfig.Configuration{}
 		zipkinPropagator := zipkin.NewZipkinB3HTTPHeaderPropagator()

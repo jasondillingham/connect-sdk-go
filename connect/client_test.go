@@ -177,6 +177,64 @@ func TestNewClientWithUserAgent(t *testing.T) {
 
 }
 
+// Regression tests for https://github.com/1Password/connect-sdk-go/issues/73.
+// A trailing newline in OP_CONNECT_TOKEN (commonly added by editors writing
+// the token to a file, then loaded via `kubectl create secret ... --from-file=`)
+// produces an Authorization header that net/http rejects with
+// `invalid header field value for "Authorization"`.
+
+func TestNewClient_TrimsTokenWhitespace(t *testing.T) {
+	client := NewClient(validHost, validToken+"\n")
+
+	restClient, ok := client.(*restClient)
+	if !ok {
+		t.Log("Unable to cast client to rest client. Was expecting restClient")
+		t.FailNow()
+	}
+
+	if restClient.Token != validToken {
+		t.Logf("Token was not trimmed: stored %q, want %q", restClient.Token, validToken)
+		t.FailNow()
+	}
+}
+
+func TestNewClientWithUserAgent_TrimsTokenWhitespace(t *testing.T) {
+	client := NewClientWithUserAgent(validHost, "  "+validToken+"\r\n", "testSuite")
+
+	restClient, ok := client.(*restClient)
+	if !ok {
+		t.Log("Unable to cast client to rest client. Was expecting restClient")
+		t.FailNow()
+	}
+
+	if restClient.Token != validToken {
+		t.Logf("Token was not trimmed: stored %q, want %q", restClient.Token, validToken)
+		t.FailNow()
+	}
+}
+
+func TestNewClientFromEnvironment_TrimsTokenWhitespace(t *testing.T) {
+	os.Setenv("OP_CONNECT_TOKEN", validToken+"\n")
+	defer os.Setenv("OP_CONNECT_TOKEN", validToken)
+
+	client, err := NewClientFromEnvironment()
+	if err != nil {
+		t.Logf("Unable to create client from environment: %q", err)
+		t.FailNow()
+	}
+
+	restClient, ok := client.(*restClient)
+	if !ok {
+		t.Log("Unable to cast client to rest client. Was expecting restClient")
+		t.FailNow()
+	}
+
+	if restClient.Token != validToken {
+		t.Logf("Token was not trimmed: stored %q, want %q", restClient.Token, validToken)
+		t.FailNow()
+	}
+}
+
 func Test_restClient_GetVaults(t *testing.T) {
 	mockHTTPClient.Dofunc = listVaults
 	vaults, err := testClient.GetVaults()
